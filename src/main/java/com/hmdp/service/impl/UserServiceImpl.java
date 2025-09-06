@@ -90,7 +90,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
 
         //存在，保存用户信息到session
-        session.setAttribute("user", user);
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        session.setAttribute("user", userDTO);
         return Result.ok();
     }
 
