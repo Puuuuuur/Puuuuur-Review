@@ -14,12 +14,17 @@ public class RedisIdWorker {
      * 开始时间戳
      */
     private static final long BEGIN_TIMESTAMP = 1640995200L;
+
     /**
      * 序列号位数
      */
     private static final long COUNT_BITS = 32;
 
     private StringRedisTemplate stringRedisTemplate;
+
+    public RedisIdWorker(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
 
     public long nextId(String keyPrefix){
         //生成时间戳
@@ -34,6 +39,7 @@ public class RedisIdWorker {
         long count = stringRedisTemplate.opsForValue().increment("icr" + keyPrefix + ":" + date);
 
         //拼接并返回
+        //先让时间戳左移32位，再把序列号用 或运算 填充在时间戳空出来的后面
         return timestamp << COUNT_BITS | count;
     }
 }
