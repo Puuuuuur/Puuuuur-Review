@@ -16,6 +16,7 @@ import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,7 @@ import javax.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -136,6 +138,52 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         //写入redis  SETBIT key offset 1
         stringRedisTemplate.opsForValue().setBit(keySuffix, dayOfMonth - 1, true);
         return Result.ok();
+    }
+
+    /**
+     * 统计签到
+     *
+     * @return {@link Result}
+     */
+    public Result signCount() {
+        ///获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        //获取日期
+        LocalDateTime now = LocalDateTime.now();
+        //拼接key
+        String key = RedisConstants.USER_SIGN_KEY + userId + now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        //获取今天是本月的第几天
+        int dayOfMonth = now.getDayOfMonth();
+        //获取本月截止今天为止的所有签到记录，返回的是一个十进制数字
+        List<Long> result = stringRedisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0)
+        );
+        if (result == null || result.size() == 0) {
+            //没有任何签到结果
+            return Result.ok(0);
+        }
+        Long num = result.get(0);
+        if (num == 0 || num == null) {
+            return Result.ok(0);
+        }
+        //循环遍历
+        int count = 0;
+        while (true){
+            //让这个数字与1进行位与运算，得到数字的最后一个bit位 判断这个bit位是否未0
+            if ((num & 1) == 0) {
+                //如果是0，说明未签到，结束
+                break;
+            } else {
+                //如果是1，说明已签到，结束 计数器+1
+                count++;
+            }
+            //把数字右移一位，抛弃最后一个bit位，继续下一个bit位
+            num = num >> 1;
+        }
+
+        return Result.ok(count);
     }
 
     private User createUserWithPhone(String phone) {
